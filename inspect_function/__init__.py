@@ -10,6 +10,8 @@ import pydantic
 
 __version__ = pathlib.Path(__file__).parent.joinpath("VERSION").read_text().strip()
 
+P = typing.ParamSpec("P")
+
 
 def inspect_function(
     func: typing.Callable[..., Union[Any, Awaitable[Any]]],
@@ -126,6 +128,84 @@ def inspect_function(
         detected_as_method=is_method_detected,
         detected_as_classmethod=is_classmethod_detected,
     )
+
+
+def inspect_parameters(
+    func: typing.Callable[P, Union[Any, Awaitable[Any]]],
+    parameters: typing.Dict[str, typing.Any],
+) -> tuple[tuple[typing.Any, ...], dict[str, typing.Any]]:
+    """
+    Inspect a function with parameters and return allowable positional and keyword arguments.
+
+    Args:
+        func: The function to inspect
+        parameters: Dictionary of parameter names to values
+
+    Returns:
+        A tuple containing:
+        - Tuple of positional arguments that can be passed to func
+        - Dictionary of keyword arguments that can be passed to func
+    """  # noqa: E501
+
+    func_inspection = inspect_function(func)
+
+    positional_args = []
+    keyword_args = {}
+    used_params = set()
+
+    # First pass: handle positional-only parameters in signature order
+    for param in func_inspection.parameters:
+        if param.kind == ParameterKind.POSITIONAL_ONLY and param.name in parameters:
+            positional_args.append(parameters[param.name])
+            used_params.add(param.name)
+
+    # Second pass: handle all other parameters
+    for param_name, param_value in parameters.items():
+        if param_name in used_params:
+            continue
+
+        # Find the parameter in the function signature
+        param_obj = None
+        for p in func_inspection.parameters:
+            if p.name == param_name:
+                param_obj = p
+                break
+
+        if param_obj is None:
+            # Parameter not found in signature -
+            # add to kwargs if function accepts **kwargs
+            var_keyword_param = func_inspection.var_keyword_param
+            if var_keyword_param:
+                keyword_args[param_name] = param_value
+            # If no **kwargs parameter,
+            # we still add it (caller will get TypeError if invalid)
+            else:
+                keyword_args[param_name] = param_value
+            continue
+
+        # Handle different parameter kinds
+        if param_obj.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
+            # Can be passed as keyword argument
+            keyword_args[param_name] = param_value
+        elif param_obj.kind == ParameterKind.KEYWORD_ONLY:
+            # Must be passed as keyword argument
+            keyword_args[param_name] = param_value
+        elif param_obj.kind == ParameterKind.VAR_POSITIONAL:
+            # Special handling for *args - expand if it's a sequence
+            if isinstance(param_value, (list, tuple)):
+                positional_args.extend(param_value)
+            else:
+                # Treat as a single positional argument
+                positional_args.append(param_value)
+        elif param_obj.kind == ParameterKind.VAR_KEYWORD:
+            # Special handling for **kwargs - merge if it's a dict
+            if isinstance(param_value, dict):
+                keyword_args.update(param_value)
+            else:
+                # Treat as a single keyword argument with the parameter name
+                keyword_args[param_name] = param_value
+
+    return tuple(positional_args), keyword_args
 
 
 class ParameterKind(StrEnum):
