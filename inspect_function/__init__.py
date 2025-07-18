@@ -17,13 +17,9 @@ def inspect_function(
     func: typing.Callable[..., Union[Any, Awaitable[Any]]],
 ) -> "FunctionInspection":
     """
-    Inspect a function and return detailed information about its signature.
-
-    Args:
-        func: A callable that returns Any or Awaitable[Any]
-
-    Returns:
-        FunctionInspection: Detailed inspection information
+    Analyze a callable's signature and return comprehensive inspection details.
+    Extracts parameter information, return type, and function characteristics
+    like async nature, method type, and parameter kinds from any function.
     """
     sig = inspect.signature(func)
 
@@ -135,16 +131,9 @@ def inspect_parameters(
     parameters: typing.Dict[str, typing.Any],
 ) -> tuple[tuple[typing.Any, ...], dict[str, typing.Any]]:
     """
-    Inspect a function with parameters and return allowable positional and keyword arguments.
-
-    Args:
-        func: The function to inspect
-        parameters: Dictionary of parameter names to values
-
-    Returns:
-        A tuple containing:
-        - Tuple of positional arguments that can be passed to func
-        - Dictionary of keyword arguments that can be passed to func
+    Transform a parameter dictionary into properly ordered args and kwargs.
+    Takes a function and parameter dict, returns a tuple of positional args
+    and keyword args that can be safely passed to the function.
     """  # noqa: E501
 
     func_inspection = inspect_function(func)
@@ -209,7 +198,12 @@ def inspect_parameters(
 
 
 class ParameterKind(StrEnum):
-    """Parameter kinds matching Python's inspect.Parameter.kind"""
+    """
+    Enumeration of Python parameter types.
+
+    Maps to Python's inspect.Parameter.kind values for different
+    parameter declaration styles (positional-only, keyword-only, etc.).
+    """
 
     POSITIONAL_ONLY = "positional_only"  # before /
     POSITIONAL_OR_KEYWORD = "positional_or_keyword"  # default
@@ -219,7 +213,12 @@ class ParameterKind(StrEnum):
 
 
 class Parameter(pydantic.BaseModel):
-    """Represents a function parameter with metadata"""
+    """
+    Detailed information about a single function parameter.
+
+    Contains metadata including type annotation, default value,
+    parameter kind, and position within the function signature.
+    """
 
     name: str
     kind: ParameterKind
@@ -239,7 +238,12 @@ class Parameter(pydantic.BaseModel):
 
 
 class FunctionInspection(pydantic.BaseModel):
-    """Complete function inspection with signature analysis"""
+    """
+    Complete analysis of a function's signature and characteristics.
+
+    Provides structured access to parameters, return type, and function
+    properties like async nature and method classification.
+    """
 
     awaitable: bool = pydantic.Field(
         ..., description="Whether the function is awaitable"
@@ -257,56 +261,56 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def is_method(self) -> bool:
-        """Check if this is an instance method"""
+        """True if this is an instance method (has 'self' parameter)."""
         return self.detected_as_method
 
     @property
     def is_classmethod(self) -> bool:
-        """Check if this is a class method"""
+        """True if this is a class method (has 'cls' parameter)."""
         return self.detected_as_classmethod
 
     @property
     def is_function(self) -> bool:
-        """Check if this is a regular function (not a method)"""
+        """True if this is a regular function (not a method or classmethod)."""
         return not self.is_method and not self.is_classmethod
 
     @property
     def is_coroutine_function(self) -> bool:
-        """Check if this is an async function"""
+        """True if this is an async function that returns a coroutine."""
         return self.awaitable
 
     @property
     def positional_only_params(self) -> typing.List[Parameter]:
-        """Get positional-only parameters (before /)"""
+        """Parameters that must be passed positionally (declared before /)."""
         return [p for p in self.parameters if p.kind == ParameterKind.POSITIONAL_ONLY]
 
     @property
     def positional_or_keyword_params(self) -> typing.List[Parameter]:
-        """Get parameters that accept positional or keyword arguments"""
+        """Parameters that can be passed either positionally or by keyword."""
         return [
             p for p in self.parameters if p.kind == ParameterKind.POSITIONAL_OR_KEYWORD
         ]
 
     @property
     def keyword_only_params(self) -> typing.List[Parameter]:
-        """Get keyword-only parameters (after *)"""
+        """Parameters that must be passed by keyword (declared after *)."""
         return [p for p in self.parameters if p.kind == ParameterKind.KEYWORD_ONLY]
 
     @property
     def var_positional_param(self) -> Parameter | None:
-        """Get the *args parameter if present"""
+        """The *args parameter if the function accepts variable positional arguments."""
         var_pos = [p for p in self.parameters if p.kind == ParameterKind.VAR_POSITIONAL]
         return var_pos[0] if var_pos else None
 
     @property
     def var_keyword_param(self) -> Parameter | None:
-        """Get the **kwargs parameter if present"""
+        """The **kwargs parameter if the function accepts variable keyword arguments."""
         var_kw = [p for p in self.parameters if p.kind == ParameterKind.VAR_KEYWORD]
         return var_kw[0] if var_kw else None
 
     @property
     def required_params(self) -> typing.List[Parameter]:
-        """Get parameters without default values (excluding *args/**kwargs)"""
+        """Parameters without default values that must be provided when calling."""
         return [
             p
             for p in self.parameters
@@ -316,12 +320,16 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def optional_params(self) -> typing.List[Parameter]:
-        """Get parameters with default values"""
+        """Parameters that have default values and are optional when calling."""
         return [p for p in self.parameters if p.has_default]
 
     @property
     def json_schema(self) -> typing.Dict[str, typing.Any]:
-        """Generate OpenAPI JSON schema for function parameters"""
+        """
+        Generate OpenAPI-compatible JSON Schema for function parameters.
+        Creates a schema object describing parameter types, defaults, and
+        requirements suitable for API documentation and validation.
+        """
 
         from inspect_function.utils.get_openapi_type import get_openapi_type
 

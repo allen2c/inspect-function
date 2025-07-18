@@ -15,7 +15,7 @@ class CustomEnum(Enum):
     OPTION_B = "b"
 
 
-class TestFunctionTypes:
+class TestInspectFunction:
     def test_function(self):
         def f(a: int, b: str, c: bool = True):
             pass
