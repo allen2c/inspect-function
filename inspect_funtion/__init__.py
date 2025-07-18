@@ -27,6 +27,40 @@ def inspect_function(
     # Check if function is awaitable/coroutine
     awaitable = asyncio.iscoroutinefunction(func)
 
+    # Detect function type using Python's built-in functions
+    is_bound_method = inspect.ismethod(func)
+
+    # For classmethods, we need to check the __func__ attribute if it exists
+    is_classmethod_detected = False
+    is_method_detected = False
+
+    if is_bound_method:
+        # This is a bound method - could be instance method or classmethod
+        # Check if it's a classmethod by looking at the underlying function
+        if hasattr(func, "__self__") and inspect.isclass(
+            getattr(func, "__self__", None)
+        ):
+            # Bound to a class, this is a classmethod
+            is_classmethod_detected = True
+        else:
+            # Bound to an instance, this is an instance method
+            is_method_detected = True
+    elif hasattr(func, "__func__"):
+        # This might be an unbound classmethod
+        if hasattr(func, "__self__") and inspect.isclass(
+            getattr(func, "__self__", None)
+        ):
+            is_classmethod_detected = True
+    else:
+        # Check if it's an unbound instance method by looking at parameter names
+        # (only as fallback when we have the signature available)
+        if len(sig.parameters) > 0:
+            first_param = list(sig.parameters.keys())[0]
+            if first_param == "self":
+                is_method_detected = True
+            elif first_param == "cls":
+                is_classmethod_detected = True
+
     # Process parameters
     parameters = []
     for i, (name, param) in enumerate(sig.parameters.items()):
@@ -85,7 +119,11 @@ def inspect_function(
     )
 
     return FunctionInspection(
-        awaitable=awaitable, parameters=parameters, return_annotation=return_annotation
+        awaitable=awaitable,
+        parameters=parameters,
+        return_annotation=return_annotation,
+        detected_as_method=is_method_detected,
+        detected_as_classmethod=is_classmethod_detected,
     )
 
 
@@ -129,26 +167,22 @@ class FunctionInspection(pydantic.BaseModel):
         default_factory=list, description="All parameters in signature order"
     )
     return_annotation: str
+    detected_as_method: bool = pydantic.Field(
+        default=False, description="Whether function was detected as an instance method"
+    )
+    detected_as_classmethod: bool = pydantic.Field(
+        default=False, description="Whether function was detected as a class method"
+    )
 
     @property
     def is_method(self) -> bool:
-        """Check if this is an instance method (has 'self' parameter)"""
-        return (
-            len(self.parameters) > 0
-            and self.parameters[0].name == "self"
-            and self.parameters[0].kind
-            in {ParameterKind.POSITIONAL_ONLY, ParameterKind.POSITIONAL_OR_KEYWORD}
-        )
+        """Check if this is an instance method"""
+        return self.detected_as_method
 
     @property
     def is_classmethod(self) -> bool:
-        """Check if this is a class method (has 'cls' parameter)"""
-        return (
-            len(self.parameters) > 0
-            and self.parameters[0].name == "cls"
-            and self.parameters[0].kind
-            in {ParameterKind.POSITIONAL_ONLY, ParameterKind.POSITIONAL_OR_KEYWORD}
-        )
+        """Check if this is a class method"""
+        return self.detected_as_classmethod
 
     @property
     def is_function(self) -> bool:
