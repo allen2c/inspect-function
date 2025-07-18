@@ -2,10 +2,13 @@
 authors = [{ name = "Allen Chou", email = "f1470891079@gmail.com" }]
 dependencies = ["pydantic (>=2,<3)", "pydantic-settings (>=2,<3)"]
 description = ""
-name = "inspect-funtion"
+name = "inspect-function"
 readme = "README.md"
 requires-python = ">=3.11,<4"
 version = "0.1.0"
+
+[tool.poetry]
+packages = [{ include = "inspect_function" }]
 
 [tool.poetry.extras]
 all = []
