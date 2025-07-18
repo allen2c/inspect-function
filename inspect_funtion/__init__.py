@@ -23,8 +23,18 @@ class Parameter(pydantic.BaseModel):
     name: str
     kind: ParameterKind
     annotation: str
-    default_value: str | None = None
-    has_default: bool = False
+    default_value: str | None = pydantic.Field(
+        default=None, description="Default value of the parameter in repr()"
+    )
+    has_default: bool = pydantic.Field(
+        default=False, description="Whether the parameter has a default value"
+    )
+    position: int | None = pydantic.Field(
+        default=None, description="Parameter position in the signature"
+    )
+    is_optional: bool = pydantic.Field(
+        default=False, description="Whether the parameter is optional"
+    )
 
 
 class FunctionInspection(pydantic.BaseModel):
