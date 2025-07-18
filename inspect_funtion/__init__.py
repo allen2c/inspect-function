@@ -1,10 +1,92 @@
+import asyncio
+import inspect
 import pathlib
 import typing
 from enum import StrEnum
+from typing import Any, Awaitable, Union
 
 import pydantic
 
 __version__ = pathlib.Path(__file__).parent.joinpath("VERSION").read_text().strip()
+
+
+def inspect_function(
+    func: typing.Callable[..., Union[Any, Awaitable[Any]]],
+) -> "FunctionInspection":
+    """
+    Inspect a function and return detailed information about its signature.
+
+    Args:
+        func: A callable that returns Any or Awaitable[Any]
+
+    Returns:
+        FunctionInspection: Detailed inspection information
+    """
+    sig = inspect.signature(func)
+
+    # Check if function is awaitable/coroutine
+    awaitable = asyncio.iscoroutinefunction(func)
+
+    # Process parameters
+    parameters = []
+    for i, (name, param) in enumerate(sig.parameters.items()):
+        # Map inspect.Parameter.kind to our ParameterKind
+        kind_mapping = {
+            inspect.Parameter.POSITIONAL_ONLY: ParameterKind.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD: (
+                ParameterKind.POSITIONAL_OR_KEYWORD
+            ),
+            inspect.Parameter.VAR_POSITIONAL: ParameterKind.VAR_POSITIONAL,
+            inspect.Parameter.KEYWORD_ONLY: ParameterKind.KEYWORD_ONLY,
+            inspect.Parameter.VAR_KEYWORD: ParameterKind.VAR_KEYWORD,
+        }
+
+        # Get annotation as string
+        annotation = (
+            str(param.annotation)
+            if param.annotation != inspect.Parameter.empty
+            else "Any"
+        )
+
+        # Handle default values
+        has_default = param.default != inspect.Parameter.empty
+        default_value = repr(param.default) if has_default else None
+
+        # Determine if parameter is optional
+        is_optional = has_default or param.kind in {
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        }
+
+        # Only set position for non-variadic parameters
+        position = (
+            i
+            if param.kind
+            not in {inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD}
+            else None
+        )
+
+        param_obj = Parameter(
+            name=name,
+            kind=kind_mapping[param.kind],
+            annotation=annotation,
+            default_value=default_value,
+            has_default=has_default,
+            position=position,
+            is_optional=is_optional,
+        )
+        parameters.append(param_obj)
+
+    # Get return annotation
+    return_annotation = (
+        str(sig.return_annotation)
+        if sig.return_annotation != inspect.Signature.empty
+        else "Any"
+    )
+
+    return FunctionInspection(
+        awaitable=awaitable, parameters=parameters, return_annotation=return_annotation
+    )
 
 
 class ParameterKind(StrEnum):
@@ -18,7 +100,7 @@ class ParameterKind(StrEnum):
 
 
 class Parameter(pydantic.BaseModel):
-    """Represents a function parameter"""
+    """Represents a function parameter with metadata"""
 
     name: str
     kind: ParameterKind
@@ -38,7 +120,7 @@ class Parameter(pydantic.BaseModel):
 
 
 class FunctionInspection(pydantic.BaseModel):
-    """Complete function inspection information"""
+    """Complete function inspection with signature analysis"""
 
     awaitable: bool = pydantic.Field(
         ..., description="Whether the function is awaitable"
@@ -50,7 +132,7 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def is_method(self) -> bool:
-        """Check if this is an instance method (has 'self' as first parameter)"""
+        """Check if this is an instance method (has 'self' parameter)"""
         return (
             len(self.parameters) > 0
             and self.parameters[0].name == "self"
@@ -60,7 +142,7 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def is_classmethod(self) -> bool:
-        """Check if this is a classmethod (has 'cls' as first parameter)"""
+        """Check if this is a class method (has 'cls' parameter)"""
         return (
             len(self.parameters) > 0
             and self.parameters[0].name == "cls"
@@ -70,29 +152,29 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def is_function(self) -> bool:
-        """Check if this is a regular function (not method or classmethod)"""
+        """Check if this is a regular function (not a method)"""
         return not self.is_method and not self.is_classmethod
 
     @property
     def is_coroutine_function(self) -> bool:
-        """Check if this is a coroutine function (async def)"""
+        """Check if this is an async function"""
         return self.awaitable
 
     @property
     def positional_only_params(self) -> typing.List[Parameter]:
-        """Get parameters that are positional-only"""
+        """Get positional-only parameters (before /)"""
         return [p for p in self.parameters if p.kind == ParameterKind.POSITIONAL_ONLY]
 
     @property
     def positional_or_keyword_params(self) -> typing.List[Parameter]:
-        """Get parameters that can be passed positionally or as keyword"""
+        """Get parameters that accept positional or keyword arguments"""
         return [
             p for p in self.parameters if p.kind == ParameterKind.POSITIONAL_OR_KEYWORD
         ]
 
     @property
     def keyword_only_params(self) -> typing.List[Parameter]:
-        """Get parameters that are keyword-only"""
+        """Get keyword-only parameters (after *)"""
         return [p for p in self.parameters if p.kind == ParameterKind.KEYWORD_ONLY]
 
     @property
@@ -109,7 +191,7 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def required_params(self) -> typing.List[Parameter]:
-        """Get all parameters that don't have default values"""
+        """Get parameters without default values (excluding *args/**kwargs)"""
         return [
             p
             for p in self.parameters
@@ -119,12 +201,12 @@ class FunctionInspection(pydantic.BaseModel):
 
     @property
     def optional_params(self) -> typing.List[Parameter]:
-        """Get all parameters that have default values"""
+        """Get parameters with default values"""
         return [p for p in self.parameters if p.has_default]
 
     @property
     def json_schema(self) -> typing.Dict[str, typing.Any]:
-        """Generate OpenAPI JSON schema for the function signature"""
+        """Generate OpenAPI JSON schema for function parameters"""
 
         from inspect_funtion.utils.get_openapi_type import get_openapi_type
 
