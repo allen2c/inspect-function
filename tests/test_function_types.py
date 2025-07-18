@@ -1,4 +1,4 @@
-from inspect_funtion import ParameterKind, inspect_function
+from inspect_function import ParameterKind, inspect_function
 
 
 class TestFunctionTypes:

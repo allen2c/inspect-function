@@ -33,4 +33,4 @@ mkdocs:
 
 # Tests
 pytest:
-	python -m pytest --cov=languru --cov-config=.coveragerc --cov-report=xml:coverage.xml
+	python -m pytest --cov=inspect_function --cov-config=.coveragerc --cov-report=xml:coverage.xml

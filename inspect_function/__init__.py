@@ -1,3 +1,4 @@
+# inspect_function/__init__.py
 import asyncio
 import inspect
 import pathlib
@@ -242,7 +243,7 @@ class FunctionInspection(pydantic.BaseModel):
     def json_schema(self) -> typing.Dict[str, typing.Any]:
         """Generate OpenAPI JSON schema for function parameters"""
 
-        from inspect_funtion.utils.get_openapi_type import get_openapi_type
+        from inspect_function.utils.get_openapi_type import get_openapi_type
 
         # Build properties for each parameter
         properties = {}
