@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/inspect-function.svg)](https://badge.fury.io/py/inspect-function)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Downloads](https://pepy.tech/badge/inspect-function)](https://pepy.tech/project/inspect-function)
+[![CI](https://github.com/allen2c/inspect-function/actions/workflows/ci.yml/badge.svg)](https://github.com/allen2c/inspect-function/actions/workflows/ci.yml)
 
 Inspect Python functions and get structured metadata as Pydantic models.
 
