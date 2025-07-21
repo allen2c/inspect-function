@@ -5,7 +5,7 @@ description = "Inspect Python functions and get structured metadata as Pydantic 
 name = "inspect-function"
 readme = "README.md"
 requires-python = ">=3.11,<4"
-version = "0.2.0"
+version = "0.2.1"
 
 [project.urls]
 Homepage = "https://github.com/allen2c/inspect-function"

@@ -265,10 +265,10 @@ class TestInspectParameters:
         # Test with extra parameters (should be ignored if no **kwargs)
         params = {"extra": "value"}
         args, kwargs = inspect_parameters(no_params, params)
-        # Function should still work since extra params go to kwargs
-        # but the function doesn't accept them, so this would raise TypeError
-        with pytest.raises(TypeError):
-            no_params(*args, **kwargs)
+        # Extra parameters should be ignored since function has no **kwargs
+        assert "extra" not in kwargs
+        result = no_params(*args, **kwargs)
+        assert result == "no-params"
 
     def test_only_variadic_parameters(self):
         """Test function with only *args and **kwargs"""
@@ -314,10 +314,10 @@ class TestInspectParameters:
         params = {"a": 1, "b": "test", "extra": "value"}
         args, kwargs = inspect_parameters(test_func, params)
 
-        # Extra parameter should be in kwargs but function doesn't accept it
-        assert "extra" in kwargs
-        with pytest.raises(TypeError):
-            test_func(*args, **kwargs)
+        # Extra parameter should be ignored since function has no **kwargs
+        assert "extra" not in kwargs
+        result = test_func(*args, **kwargs)
+        assert result == "1-test"
 
     def test_extra_parameters_with_kwargs(self):
         """Test function with extra parameters when **kwargs exists"""

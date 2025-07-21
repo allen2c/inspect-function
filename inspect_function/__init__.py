@@ -205,14 +205,11 @@ def inspect_parameters(
             continue
 
         # Parameter not found in signature -
-        # add to kwargs if function accepts **kwargs
+        # only add to kwargs if function accepts **kwargs
         var_keyword_param = func_inspection.var_keyword_param
         if var_keyword_param:
             keyword_args[param_name] = param_value
-        # If no **kwargs parameter,
-        # we still add it (caller will get TypeError if invalid)
-        else:
-            keyword_args[param_name] = param_value
+        # If no **kwargs parameter, ignore extra parameters
 
     return tuple(positional_args), keyword_args
 
